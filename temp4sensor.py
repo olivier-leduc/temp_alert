@@ -21,7 +21,7 @@ workHiRoom = 99
 workLowFreezer = -30
 workHiFreezer = 5
 TO_ADDRESS = 'oleduc-pager@google.com'
-FROM_ADDRESS = 'kenjileduc@gmail.com'
+FROM_ADDRESS = 'sender_email_address'
 MESSAGE = ''
 WAIT_TIME = 3600
 
@@ -52,12 +52,12 @@ class TimerClass(threading.Thread):
 		    msg_time  = datetime.now(tz=pytz.timezone(("America/Los_Angeles")))
 	            log.write("{0},{1}, {2}\n".format(str(msg_time.strftime('%Y-%m-%d %H:%M:%S')),str(freezerTemp),str(roomTemp)))
 	            t1 = time.time()
-	       #     if t1 - t0 > WAIT_TIME:
-	       #         if checkTempRanges(roomTemp, freezerTemp):
-	       # 	    # checkTempRanges returns True if temp is out of bounds
-	       #             t0 = time.time()  # This make sure we wait until WAIT_TIME is complete until we we check temp again.
-	       # 	    #print('reset t0:', time.strftime('%H:%M:%S', time.localtime(t0)))
-	       #     	    time.sleep(2)
+	            if t1 - t0 > WAIT_TIME:
+	                if checkTempRanges(roomTemp, freezerTemp):
+	        	    # checkTempRanges returns True if temp is out of bounds
+	                    t0 = time.time()  # This make sure we wait until WAIT_TIME is complete until we we check temp again.
+	        	    #print('reset t0:', time.strftime('%H:%M:%S', time.localtime(t0)))
+	            	    time.sleep(2)
 	            self.event.wait( 150 )
 
     def stop(self):
@@ -69,14 +69,12 @@ def read_temp_raw(sense):
     global toggledots
     semi = ((' ',':'))   # toggle colon to prove we are running
     if sense == 1:
-##      print "----sensor 1:----"
       if toggledots is 0:
         toggledots = 1
       else:    
         toggledots = 0
       f = open(device_file, 'r')
     else:
-##      print "sensor 2:"
       f = open(device_file_two, 'r')
  
     lines = f.readlines()

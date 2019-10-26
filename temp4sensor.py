@@ -22,7 +22,7 @@ workLowFreezer = -30
 workHiFreezer = 5
 TO_ADDRESS = 'oleduc-pager@google.com'
 FROM_ADDRESS = 'sender_email_address'
-MESSAGE = ' '
+MESSAGE = ''
 WAIT_TIME = 3600
 
 from time import sleep

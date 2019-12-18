@@ -31,7 +31,7 @@ APPLICATION_NAME = 'Gmail API Python Quickstart'
 def InitGoogleService(app, version, flags):
     credentials =  get_credentials(flags)
     http = credentials.authorize(httplib2.Http())
-    service = _BUILD(app, version, http=http)
+    service = _BUILD(app, version, http=http, cache_discovery=False)
     return service
 
 
@@ -76,10 +76,10 @@ def SendMessage(service, user_id, message):
   try:
     message = (service.users().messages().send(userId=user_id, body=message)
                .execute())
-    print 'Message Id: %s' % message['id']
+    print('Message Id: %s' % message['id'])
     return message
-  except errors.HttpError, error:
-    print 'An error occurred: %s' % error
+  except errors.HttpError as e:
+    print('An error occurred: %s' % e)
 
 
 def CreateMessage(sender, to, subject, message_text):
@@ -118,7 +118,7 @@ def AppendGsheet(service, values, sheet_id):
   try:
     response = request.execute()
   except errors as e:
-    print e
+    print(e)
     raise
   return response
 
@@ -140,7 +140,7 @@ def ClearSheet(service, sheet_id):
   try:
     response = request.execute()
   except errors as e:
-    print e
+    print(e)
     raise
   return response
 

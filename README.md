@@ -2,10 +2,18 @@
 
 ## What does it do
 
-Measure temperature using the DS18B20 temperature sensor
-on raspberry pi.
+Take temperature, humidity and Air quality measurements and write to a Google spreadsheet.
+
+## Hardware
+
+* A raspberry pi (I use a raspberri pi zero).
+* One or two DS18B20 sensors for accurate temperature measurements.
+* One DHT22 for humidity (can also use the builtin temp sensor but I found it to be less accurate, let alone the fact that I can't put it in the freezer.)
+* One Nova PM sensor SDS011 for air quality
 
 ## Prerequisites
+
+[TODO]
 
 ### Wiring
 

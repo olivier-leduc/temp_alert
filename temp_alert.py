@@ -47,8 +47,8 @@ OUTPUT_FILE = "/home/pi/freezer_room_temp.csv"
 # Max number of rows in Google spreadsheet, before starting to clear the last row
 MAX_ROWS = 300
 # Email alert addresses.
-TO_ADDRESS = '4154121947@msg.fi.google.com, 4157307200@txt.att.net'
-FROM_ADDRESS = 'kenjileduc@gmail.com'
+TO_ADDRESS = '1234561234@txt.att.net'
+FROM_ADDRESS = 'youremail@foo.com'
 # Time to wait in seconds between each measurement.
 WAIT_TIME = 600
 # Time to wait after temperature reached bound limit.
@@ -86,16 +86,16 @@ class TempAlert(object):
       # Prepping the data to send to Google Spreadsheet.
       row = [[msg_time, temp_1, dht22_temp, humidity, air_quality],]
       self.WriteToSheet(row)
-      temp_reads = {}
       t1 = time.time()
       if t1 - t0 > ALERT_WAIT:
+        temp_reads = {}
         if temp_1 != NO_READING:
           temp_reads['room1'] = temp_1
         if temp_2 != NO_READING:
           temp_reads['room2'] = temp_2
         if dht22_temp != NO_READING:
           temp_reads['Elize room'] = dht22_temp
-        for room, temp in temp_reads:
+        for room, temp in temp_reads.items():
           if self.CheckTempRanges(room, temp, ROOM_TEMP_MIN_MAX):
             # CheckTempRanges returns True if temp is out of bounds
             t0 = time.time()  # This make sure we wait until ALERT_WAIT is complete until we check temp again and send an alert.

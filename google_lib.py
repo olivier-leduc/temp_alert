@@ -98,7 +98,10 @@ def CreateMessage(sender, to, subject, message_text):
   message['to'] = to
   message['from'] = sender
   message['subject'] = subject
-  return {'raw': base64.urlsafe_b64encode(message.as_string())}
+  #return {'raw': base64.urlsafe_b64encode(message.as_bytes())}
+  b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+  b64_string = b64_bytes.decode()
+  return {'raw': b64_string}
 
 
 def AppendGsheet(service, values, sheet_id):

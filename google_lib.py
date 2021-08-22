@@ -24,7 +24,7 @@ from oauth2client import tools
 _BUILD = discovery.build
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = '/home/pi/credentials/client_secret.json'
+CLIENT_SECRET_FILE = '/home/pi/client_secret.json'
 APPLICATION_NAME = 'Gmail API Python Quickstart'
 
 
@@ -44,8 +44,8 @@ def get_credentials(flags):
     Returns:
         Credentials, the obtained credential.
     """
-    home_dir = os.path.expanduser('/home/pi/temp_alert')
-    credential_dir = os.path.join(home_dir, 'credentials')
+    credential_dir = os.path.expanduser('/home/pi')
+    #credential_dir = os.path.join(home_dir, 'credentials')
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,

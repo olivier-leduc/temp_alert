@@ -16,8 +16,10 @@ Take temperature, humidity and Air quality measurements and write to a Google sp
 
 ### Wiring
 
-[Wiring of a single sensor to a Raspi2 (same wiring for the PiZero)](images/Raspberry-Pi-DS18B20.png)
-
+DHT22:
+  +: 3.3V
+  data: GPIO3
+  -: ground
 
 ### Enable modprobe
 ```
@@ -27,6 +29,7 @@ dtoverlay=w1-gpio" >> /boot/config.txt
 
 sudo reboot
 
+sudo modprobe w1-gpio
 sudo modprobe w1-therm
 ```
 
@@ -37,7 +40,7 @@ pip3 install -r requirements.txt
 ```
 
 ### Enable Google spreadsheet API from your Google Cloud console
-Lookup how to do this.
+This is fairly well documented online.
 
 ### Copy Google client-secret from Google Cloud console
 ```

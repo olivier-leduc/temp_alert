@@ -1,64 +1,58 @@
 """Uses Google APIs to send email and update spreadsheet.
 """
+from __future__ import print_function
 
+import os
+import os.path
 import base64
-import logging
-from email.mime.audio import MIMEAudio
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
-from email.mime.multipart import MIMEMultipart
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
 from email.mime.text import MIMEText
-import mimetypes
-import os
 
-#from __future__ import print_function
-import httplib2
-import os
-
-from googleapiclient import discovery
 from googleapiclient import errors
-import oauth2client.file
-from oauth2client import client
-from oauth2client import tools
 
-_BUILD = discovery.build
-
-SCOPES = ['https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = '/home/pi/client_secret.json'
-APPLICATION_NAME = 'Gmail API Python Quickstart'
+# If modifying these scopes, delete the file token.json.
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://mail.google.com/']
+CLIENT_TOKEN = '/home/kenjidnb/temp_alert/token.json'
 
 
 def InitGoogleService(app, version, flags):
-    credentials =  get_credentials(flags)
-    http = credentials.authorize(httplib2.Http())
-    service = _BUILD(app, version, http=http, cache_discovery=False)
+    creds =  get_credentials()
+    service = build(app, version, credentials=creds)
     return service
 
 
-def get_credentials(flags):
-    """Gets valid user credentials from storage.
+def get_credentials():
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time. 
+    # When the auth flow runs for the first time, it will generate a URL,
+    # which needs to be accessed from the computer that generates it (i.e. not 
+    # from a remote computer). When SSH'ing to a headless computer like a 
+    # raspberry pi, we can use X11 and open a web browser through it in order 
+    # to complete the authorization flow and download the token file.
 
-    If nothing has been stored, or if the stored credentials are invalid,
-    the OAuth2 flow is completed to obtain the new credentials.
-
-    Returns:
-        Credentials, the obtained credential.
-    """
-    credential_dir = os.path.expanduser('/home/pi')
-    #credential_dir = os.path.join(home_dir, 'credentials')
-    if not os.path.exists(credential_dir):
-        os.makedirs(credential_dir)
-    credential_path = os.path.join(credential_dir,
-                                   'google_creds.json')
-
-    store = oauth2client.file.Storage(credential_path)
-    credentials = store.get()
-    if not credentials or credentials.invalid:
-        flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
-        flow.user_agent = APPLICATION_NAME
-        credentials = tools.run_flow(flow, store, flags)
-        print('Storing credentials to ' + credential_path)
-    return credentials
+    creds = None
+    if os.path.exists(CLIENT_TOKEN):
+        creds = Credentials.from_authorized_user_file(CLIENT_TOKEN, SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                '/home/kenjidnb/temp_alert/credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('/home/kenjidnb/temp_alert/token.json', 'w') as token:
+            token.write(creds.to_json())
+    print("CREDS", creds)
+    return creds
 
 
 def SendMessage(service, user_id, message):
@@ -102,49 +96,4 @@ def CreateMessage(sender, to, subject, message_text):
   b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
   b64_string = b64_bytes.decode()
   return {'raw': b64_string}
-
-
-def AppendGsheet(service, values, sheet_id):
-  """Append rows to Google spreadsheet.
-
-  Args:
-    credentials:  oauth2 credentials for accessing the Drive API.
-    sheet_id: A string, Titleid of the Gsheet
-  Returns:
-  """
-  request = service.spreadsheets().values().append(
-      spreadsheetId=sheet_id,
-      range='Sheet1!A1',
-      valueInputOption='RAW',
-      body={ 'values': values }
-  )
-  try:
-    response = request.execute()
-  except errors as e:
-    print(e)
-    raise
-  return response
-
-
-def ClearSheet(service, sheet_id):
-  """Clear rows from given Google spreadsheet.
-
-  Args:
-    credentials:  oauth2 credentials for accessing the Drive API.
-    sheet_id: A string, Titleid of the Gsheet
-  Returns:
-  """
-  range_all_rows = 'Sheet1!A2:Z'
-  request = service.spreadsheets().values().clear(
-      spreadsheetId=sheet_id,
-      range = range_all_rows,
-      body = {}
-      )
-  try:
-    response = request.execute()
-  except errors as e:
-    print(e)
-    raise
-  return response
-
 

@@ -17,9 +17,9 @@ Take temperature, humidity and Air quality measurements and write to a Google sp
 ### Wiring
 
 DHT22:
-  +: 3.3V
-  data: GPIO3
-  -: ground
+  * +: 3.3V
+  * data: GPIO3
+  * -: ground
 
 ### Enable modprobe
 ```
@@ -40,42 +40,32 @@ pip3 install -r requirements.txt
 ```
 
 ### Enable Google spreadsheet API from your Google Cloud console
-This is fairly well documented online.
-
-### Copy Google client-secret from Google Cloud console
-```
-echo <your_google_api_secret> > client_secret.json
-```
+ This is fairly well documented online but essentially you would need to create a project from the Google cloud console, this project should allow the use of the Gmail API and the Google spreadsheet API to your account.
+Then create credentials to access the API, at the time of writing the creds are in OAuth 2.0 format. Download the json file into the temp_alert folder and name it credentials.json.
 
 ### First run
-We need to allow the script to access your google account. Add the 
- "--noauth_local_webserver" on the first run. Ex:
+We need to allow the script to access your google account. In order to allow the Google API to access your account, we need to run the authorization workflow, wich requires login in to your google account. Browsing that URL can only work from the same machine where the script runs from. Given that this is most likely a headless computer (e.g. a raspberry pi), you would need to either use ssh tunnel, or X window. I used X window as it was the most straightforward option. 
+
+Run the command for the first time from the CLI will trigger the auth workflow.
 ```
-python3 temp_alert.py --sheetid 1ZBNVL7OTabZZkPO_8sc_f3FzerB-VQrGj1sS_BVybgc --frequency 15 --debug --noauth_local_webserver
+python3 temp_alert.py --sheetid 1ZBNVL7OTabZZkPO_8sc_f3FzerB-VQrGj1sS_BVybgc --frequency 15
 ```
 
-### Run as startup script:
+### Create as service so it will auto start at boot time:
 
+sudo vi /lib/systemd/system/temp_alert.service
 ```
-cat /etc/init.d/temp_alert.sh
-#! /bin/sh
-# /etc/init.d/temp_alert
+[Unit]
+Description=TempAlert
+After=multi-user.target
 
-### BEGIN INIT INFO
-# Provides:          temp_alert.py
-# Required-Start:    $remote_fs $syslog
-# Required-Stop:     $remote_fs $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Start daemon at boot time
-# Description:       Enable service provided by daemon.
-### END INIT INFO
+[Service]
+ExecStart=/usr/bin/python3 /home/<replace_with_username>/temp_alert/temp_alert.py --sheetid 1n44bjHaKoMzoYmxDiink791TIWgy_5Ga7VFg9W1GhFY --frequency '15' --alertable
+Restart=always
+User=<replace_with_username>
 
-echo "starting temperature monitor"
-/usr/bin/python3 /home/pi/temp_alert.py --sheetid 1n44bjHaKoMzoYmxDiink791TIWgy_5Ga7VFg9W1GhFY --alertable --frequency 15
-exit 0
+[Install]
+WantedBy=multi-user.target
 
-sudo update-rc.d temp_alert.sh defaults
-sudo update-rc.d temp_alert.sh enable
 ```
 

@@ -12,10 +12,14 @@
 # 1) logs temperature onto a Google spreadsheet and optionally to a local log file.
 # 2) Sends an email when temperature or airquality goes out of bounds.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
+from plant_monitor import PlantMonitor
 import serial
 import time
+
+import board
+from adafruit_bme280 import basic as adafruit_bme280
 
 import argparse
 import pytz
@@ -25,38 +29,42 @@ import glob
 import logging
 import threading
 import google_lib
-import Adafruit_DHT
+#import Adafruit_DHT
 from oauth2client import tools
 
 parser = argparse.ArgumentParser(parents=[tools.argparser], description='')
 parser.add_argument('--sheetid', dest='sheetid')
 parser.add_argument('--frequency', dest='freq')
+parser.add_argument('--toemail', dest='toemail')
+parser.add_argument('--fromemail', dest='fromemail')
+parser.add_argument('--tempmin', dest='tempmin')
+parser.add_argument('--tempmax', dest='tempmax')
+parser.add_argument('--dht22', dest='dht22', action='store_true')
+parser.add_argument('--bme280', dest='bme280', action='store_true')
+parser.add_argument('--ds18b20', dest='ds18b20', action='store_true')
+parser.add_argument('--plantmonitor', dest='plantmonitor', action='store_true')
 parser.add_argument('--alertable', dest='alert', action='store_true')
 flags = parser.parse_args()
 
-DHT_SENSOR = Adafruit_DHT.DHT22
+#DHT_SENSOR = Adafruit_DHT.DHT22
 DHT_PIN = 3
-# Temperature bounds.
-TEMP_MIN_MAX = {"room":[62, 95], "freezer":[-30, 5]}
+# Default temperature bounds.
+TEMP_MIN_MAX = {"room":(62, 95), "freezer":(-30, 5)}
 # Air quality threshold.
 AIR_QUAL_THRESHOLD = 100
 # Path of local CSV file.
 OUTPUT_FILE = "/home/kenjidnb/freezer_room_temp.csv"
 # Max number of rows in Google spreadsheet, before starting to clear the last row
 MAX_ROWS = 300
-# Email alert addresses.
-TO_ADDRESS = '5127348000@txt.att.net, ocleduc@gmail.com'
-FROM_ADDRESS = 'kenjileduc@gmail.com'
-# ALERT_FREQ = flags.freq x 4 = Wait time between each alert`
-ALERT_FREQ = 4
 # Replace with bogus value when no reading on sensor.
 NO_READING = "-999"
+TEMPSENSOR1 = "outside"
+TEMPSENSOR2 = "room"
+TEMPSENSOR3 = "freezer"
 
 
 def LoadDS18B20Sensors():
   # need to be root to do this
-  os.system('modprobe w1-gpio')
-  os.system('modprobe w1-therm')
   base_dir = '/sys/bus/w1/devices/'
   sensor_path_list = []
   try:
@@ -68,12 +76,11 @@ def LoadDS18B20Sensors():
 
 def GetDS18B20Temps():
  sensor_path_list = LoadDS18B20Sensors()
- temp_1 = temp_2 = NO_READING
  if sensor_path_list:
-   temp_1 = ReadDS18B20Temp(sensor_path_list[0])
+   temp_2 = ReadDS18B20Temp(sensor_path_list[0])
    if len(sensor_path_list) == 2:
-     temp_2 = ReadDS18B20Temp(sensor_path_list[1])
- return temp_1, temp_2
+     temp_3 = ReadDS18B20Temp(sensor_path_list[1])
+ return temp_2, temp_3
 
 def ReadAirQuality():
   try:
@@ -94,6 +101,24 @@ def ReadAirQuality():
   if Decimal(float(pmten)) >= 200:
       air_quality = NO_READING
   return air_quality
+
+def ReadBme280HumidityTempPressure(bme280):
+  try:
+    bme280.sea_level_pressure = 1013.25
+    temp_c = bme280.temperature
+    humidity = bme280.relative_humidity
+    pressure = bme280.pressure
+    if not humidity or not temp_c:
+      print("Failed to retrieve data from humidity sensor")
+      return NO_READING, NO_READING
+  except Exception as err:
+    print("Failed to retrieve data from humidity sensor" % err)
+    return NO_READING, NO_READING
+  # Convert the temperature from Celsius to Fahrenheit.
+  temp_f = round((temp_c * 9.0 / 5.0 + 32.0), 1)
+  humidity = round(humidity, 1)
+  return float(humidity), float(temp_f), float(pressure)
+
 
 def ReadDHT22HumidityTemp():
   try:
@@ -131,43 +156,52 @@ def ReadDS18B20Temp(sensor_path):
     return NO_READING
 
 def CheckAirQualityRanges(air_quality):
-  if Decimal(air_quality) > AIR_QUAL_THRESHOLD:
+  if air_quality != NO_READING and (Decimal(air_quality) > AIR_QUAL_THRESHOLD):
     subject = 'Air Quality alert: ' + str(air_quality) + ' (UNHEALTHY) '
     message = 'http://shorturl.at/uPVY4'
     SendEmailAlert(subject, message)
+    return True
+  else:
+    return False
 
-def CheckTempRanges(room, temperature, temp_min_max):
+def CheckTempRanges(tempsensor, temperature, temp_min_max):
+  '''returns true if alert fires'''
+  if temperature == NO_READING:
+    return False
   #message = 'http://shorturl.at/tyFGNo'
   message = ''  # Verizon filters text with URLs in body.
+  if flags.tempmin and flags.tempmax:
+    temp_min_max = (int(flags.tempmin), int(flags.tempmax))
   if Decimal(temperature) >= Decimal(temp_min_max[1]):
     cold_or_warm = 'warm! '
   elif Decimal(temperature) <= Decimal(temp_min_max[0]) and temperature != NO_READING:
     cold_or_warm = 'cold! '
   else:
     return False
-  logging.info('Temp too %s in %s: %s', cold_or_warm, room, str(temperature)) 
-  subject = '[Temperature alert] ' + room + ' too  ' + cold_or_warm.upper() + str(temperature)
-  logging.info('Sending alert messages to %s', TO_ADDRESS)
+  subject = 'Temp too {}, "{}": {}'.format(cold_or_warm, tempsensor, str(temperature)) 
+  logging.info(subject)
+  logging.info('Sending alert messages to %s', flags.toemail)
   SendEmailAlert(subject, message)
+  time.sleep(2) # Can't remember why I put this timer.
   return True
 
 def SendEmailAlert(subject, message):
   service = google_lib.InitGoogleService('gmail', 'v1', flags)
   logging.info('Google_lib service: %s', service)
-  email = google_lib.CreateMessage(FROM_ADDRESS, TO_ADDRESS, subject, message)
+  email = google_lib.CreateMessage(flags.fromemail, flags.toemail, subject, message)
   google_lib.SendMessage(service, "me", email)
 
-def WriteToSheet(dht22_temp, humidity, temp_1, temp_2, air_quality):
+def WriteToSheet(temp_reads, humidity, pressure, air_quality, wetness):
   # Log everything
   msg_time  = datetime.now(tz=pytz.timezone(("America/Chicago"))).strftime('%H:%M:%S %m-%d')
-  logging.info("time: %s, dht22_temp: %s, humidity: %s, temp_1: %s, temp_2: %s, airquality: %s", msg_time, dht22_temp, humidity, temp_1, temp_2, air_quality)
+  logging.info("time: %s, tempsensor1: %s, humidity: %s, pressure: %s, tempsensor2: %s, tempsensor3: %s, airquality: %s, wetness: %s", msg_time, temp_reads[TEMPSENSOR1], humidity, pressure, temp_reads[TEMPSENSOR2], temp_reads[TEMPSENSOR3], air_quality, wetness)
   with open(OUTPUT_FILE, "a") as log:
-    log.write("{0}, {1}, {2}, {3}, {4}\n".format(msg_time, dht22_temp, humidity, temp_1, temp_2, air_quality))
-  row = [[msg_time, dht22_temp, humidity, temp_1, temp_2, air_quality],]
+    log.write("{0}, {1}, {2}, {3}, {4}, {5} {6}\n".format(msg_time, temp_reads[TEMPSENSOR1], humidity, pressure, temp_reads[TEMPSENSOR2], temp_reads[TEMPSENSOR3], air_quality, wetness))
+  row = [[msg_time, temp_reads[TEMPSENSOR1], humidity, pressure, temp_reads[TEMPSENSOR2], temp_reads[TEMPSENSOR3], air_quality, wetness],]
   sheet_content = ''
   try:
     sheetservice = google_lib.InitGoogleService('sheets', 'v4', flags)
-    sheet_content = list(sheetservice.spreadsheets().values().get(spreadsheetId=flags.sheetid, range="Sheet1!A1:E").execute().values())
+    sheet_content = list(sheetservice.spreadsheets().values().get(spreadsheetId=flags.sheetid, range="Sheet1!A1:H").execute().values())
   except Exception as err:
     logging.error("Exception with sheet: %s", err)
     return
@@ -224,34 +258,39 @@ def WriteToSheet(dht22_temp, humidity, temp_1, temp_2, air_quality):
     return
 
 def run():
-  count = 0
-  while True:
-    # Get temps from DS18B20
-    temp_1, temp_2 = GetDS18B20Temps()
-    # Get humitidy and temp from DHT22
-    humidity, dht22_temp = ReadDHT22HumidityTemp()
+  # Create sensor object, using the board's default I2C bus.
+  i2c = board.I2C()  # uses board.SCL and board.SDA
+  bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)
+  temp_reads = {TEMPSENSOR1: NO_READING, TEMPSENSOR2: NO_READING, TEMPSENSOR3: NO_READING}
+  alert_time = datetime.now()
+  while True: # This thing runs 24/7
+    if flags.bme280:
+      humidity, temp_reads[TEMPSENSOR1], pressure = ReadBme280HumidityTempPressure(bme280)
+    elif flags.ds18b20:
+      temp_reads[TEMPSENSOR2], temp_reads[TEMPSENSOR3] = GetDS18B20Temps()
+    elif flags.dht22:
+      humidity, temp_reads[TEMPSENSOR3] = ReadDHT22HumidityTemp()
     # Get air quality from SDS011
     air_quality = ReadAirQuality()
+    # Get wetness from plantmonitor
+    if flags.plantmonitor:
+        pm=PlantMonitor()
+        wetness = str(pm.get_wetness())
+    else:
+        wetness = NO_READING
     # Send data to Google Spreadsheet.
-    WriteToSheet(dht22_temp, humidity, temp_1, temp_2, air_quality)
+    WriteToSheet(temp_reads, humidity, pressure, air_quality, wetness)
     # Run the alert routine
-    count = 0 if count == ALERT_FREQ else count  # Reset counter every ALERT_FREQ
-    count += 1
-    if flags.alert and count == 1:  # Only run the alerts once every ALERT_FREQ
-      temp_reads = {}
-      if temp_1 != NO_READING:
-        temp_reads['freezer'] = temp_1
-      if temp_2 != NO_READING:
-        temp_reads['garage'] = temp_2
-      if dht22_temp != NO_READING:
-        temp_reads['room'] = dht22_temp
-      if temp_reads:
-          for room, temp in temp_reads.items():
-              if CheckTempRanges(room, temp, TEMP_MIN_MAX[room]):  # Send temperature alert if needed. CheckTempRanges returns True if temp is out of bounds
-                time.sleep(2)
-      if air_quality != NO_READING:
-          CheckAirQualityRanges(air_quality)  # Send AirQual alert if needed
-    time.sleep(int(flags.freq)*60)
+    if flags.alert and (datetime.now() - alert_time) > timedelta(seconds=3600):  # One alert per hour max.
+        for tempsensor, temp in temp_reads.items():
+            # Send temperature alert if needed. CheckTempRanges returns True and sends alert if temp is out of bounds
+            tempalert_fired = CheckTempRanges(tempsensor, temp, TEMP_MIN_MAX)
+        airqualalert_fired = CheckAirQualityRanges(air_quality)  # Send AirQual alert if needed
+        if tempalert_fired or airqualalert_fired:
+            logging.info("Alerts fired, continuing to monitor")
+            alert_time = datetime.now()
+    logging.info('Monitoring cycle complete, waiting %s seconds before starting a new cycle', flags.freq)
+    time.sleep(int(flags.freq))
 
 
 def main():

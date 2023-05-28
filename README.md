@@ -2,13 +2,16 @@
 
 ## What does it do
 
-Take temperature, humidity and Air quality measurements and write to a Google spreadsheet.
+Take temperature, humidity, soil wetness and Air quality measurements and write to a Google spreadsheet.
 
 ## Hardware
 
 * A raspberry pi (I use a raspberri pi zero).
-* One or two DS18B20 sensors for accurate temperature measurements.
-* One DHT22 for humidity (can also use the builtin temp sensor but I found it to be less accurate, let alone the fact that I can't put it in the freezer.)
+* Various options for temperature and humidity:
+  * One or two DS18B20 sensors for high range temperature measurements(eg. freezer).
+  * DHT22, the cheaper less accurate alternative. humidity sensor built-in.
+  * bme280, precise temp and humidity sensor.
+* Plant monitor for soil wetness monitoring.
 * One Nova PM sensor SDS011 for air quality
 
 ## Prerequisites

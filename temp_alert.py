@@ -263,7 +263,7 @@ def run():
   # Create sensor object, using the board's default I2C bus.
   temp_reads = {TEMPSENSOR1: NO_READING, TEMPSENSOR2: NO_READING, TEMPSENSOR3: NO_READING}
   alert_time = datetime.now()
-  if flags.bme280 or flags.ic7021:
+  if flags.bme280 or flags.si7021:
     i2c = board.I2C()  # uses board.SCL and board.SDA
   while True: # This thing runs 24/7
     if flags.bme280:

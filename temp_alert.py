@@ -20,6 +20,7 @@ import time
 
 import board
 from adafruit_bme280 import basic as adafruit_bme280
+import adafruit_si7021
 
 import argparse
 import pytz

@@ -42,6 +42,8 @@ parser.add_argument('--tempmax', dest='tempmax')
 parser.add_argument('--dht22', dest='dht22', action='store_true')
 parser.add_argument('--bme280', dest='bme280', action='store_true')
 parser.add_argument('--ds18b20', dest='ds18b20', action='store_true')
+parser.add_argument('--airqual', dest='airqual', action='store_true')
+parser.add_argument('--si7021', dest='si7021', action='store_true')
 parser.add_argument('--plantmonitor', dest='plantmonitor', action='store_true')
 parser.add_argument('--alertable', dest='alert', action='store_true')
 flags = parser.parse_args()
@@ -102,12 +104,12 @@ def ReadAirQuality():
       air_quality = NO_READING
   return air_quality
 
-def ReadBme280HumidityTempPressure(bme280):
+def ReadPreciseHumidityTempPressure(sensor):
   try:
-    bme280.sea_level_pressure = 1013.25
-    temp_c = bme280.temperature
-    humidity = bme280.relative_humidity
-    pressure = bme280.pressure
+    sensor.sea_level_pressure = 1013.25
+    temp_c = sensor.temperature
+    humidity = sensor.relative_humidity
+    pressure = sensor.pressure
     if not humidity or not temp_c:
       print("Failed to retrieve data from humidity sensor")
       return NO_READING, NO_READING
@@ -259,21 +261,28 @@ def WriteToSheet(temp_reads, humidity, pressure, air_quality, wetness):
 
 def run():
   # Create sensor object, using the board's default I2C bus.
-  i2c = board.I2C()  # uses board.SCL and board.SDA
-  bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)
   temp_reads = {TEMPSENSOR1: NO_READING, TEMPSENSOR2: NO_READING, TEMPSENSOR3: NO_READING}
   alert_time = datetime.now()
+  if flags.bme280 or flags.ic7021:
+    i2c = board.I2C()  # uses board.SCL and board.SDA
   while True: # This thing runs 24/7
     if flags.bme280:
-      humidity, temp_reads[TEMPSENSOR1], pressure = ReadBme280HumidityTempPressure(bme280)
+      bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)
+      humidity, temp_reads[TEMPSENSOR1], pressure = ReadPreciseHumidityTempPressure(bme280)
+    elif flags.si7021:
+      si7021 = adafruit_si7021.SI7021(board.I2C())
+      humidity, temp_reads[TEMPSENSOR1], pressure = ReadPreciseHumidityTempPressure(si7021)
     elif flags.ds18b20:
       temp_reads[TEMPSENSOR2], temp_reads[TEMPSENSOR3] = GetDS18B20Temps()
     elif flags.dht22:
       humidity, temp_reads[TEMPSENSOR3] = ReadDHT22HumidityTemp()
-    # Get air quality from SDS011
-    air_quality = ReadAirQuality()
-    # Get wetness from plantmonitor
+    if flags.airqual:
+      # Get air quality from SDS011
+      air_quality = ReadAirQuality()
+    else:
+      air_quality = NO_READING
     if flags.plantmonitor:
+        # Get wetness from plantmonitor
         pm=PlantMonitor()
         wetness = str(pm.get_wetness())
     else:

@@ -10,7 +10,7 @@ Take temperature, humidity, soil wetness and Air quality measurements and write 
 * Various options for temperature and humidity:
   * One or two DS18B20 sensors for high range temperature measurements(eg. freezer).
   * DHT22, the cheaper less accurate alternative. humidity sensor built-in.
-  * bme280, precise temp and humidity sensor.
+  * bme280 or si7021, precise temp and humidity sensor.
 * Plant monitor for soil wetness monitoring.
 * One Nova PM sensor SDS011 for air quality
 
@@ -24,7 +24,13 @@ DHT22:
   * data: GPIO3
   * -: ground
 
-### Enable modprobe
+### Enable I2C interface (only needed for BME280 and si7021)
+```
+
+enable i2c interface via raspi-config interface menu.
+```
+
+### Enable modprobe (only needed for DS18B20)
 ```
 sudo echo "
 # OneWire support for temp sensor
@@ -41,6 +47,7 @@ sudo modprobe w1-therm
 ```
 pip3 install -r requirements.txt
 ```
+
 
 ### Enable Google spreadsheet API from your Google Cloud console
  This is fairly well documented online but essentially you would need to create a project from the Google cloud console, this project should allow the use of the Gmail API and the Google spreadsheet API to your account.

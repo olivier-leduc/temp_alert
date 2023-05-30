@@ -1,7 +1,7 @@
 Adafruit_Blinka==8.16.1
 adafruit_bme280==1.0.1
 adafruit_circuitpython_bme280==2.6.19
-board==1.0
+adafruit-circuitpython-si7021==4.1.9
 google_api_python_client==2.87.0
 google_auth_oauthlib==1.0.0
 oauth2client==4.1.3

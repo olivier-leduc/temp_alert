@@ -106,11 +106,13 @@ def ReadAirQuality():
   return air_quality
 
 def ReadPreciseHumidityTempPressure(sensor):
+  pressure = NO_READING
   try:
-    sensor.sea_level_pressure = 1013.25
     temp_c = sensor.temperature
     humidity = sensor.relative_humidity
-    pressure = sensor.pressure
+    if flags.bme280:
+      sensor.sea_level_pressure = 1013.25
+      pressure = sensor.pressure
     if not humidity or not temp_c:
       print("Failed to retrieve data from humidity sensor")
       return NO_READING, NO_READING
